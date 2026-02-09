@@ -25,7 +25,7 @@ int main()
 
     // Bird
     Bird bird;
-    bird.rect = {50, 200, 30, 30};
+    bird.rect = {50, 200, 60, 60};
     bird.velocity = 0;
 
     const float gravity = 900.0f;
@@ -40,6 +40,15 @@ int main()
     float pipeTimer = 0;
     int score = 0;
     bool gameOver = false;
+
+    Texture2D birdTex = LoadTexture("sprite_sheet.png");
+    const int frameCount = 3; // number of frames in sprite sheet
+    const int frameWidth = birdTex.width / frameCount;
+    const int frameHeight = birdTex.height;
+
+    int currentFrame = 0;
+    float frameTime = 0.0f;
+    const float frameDelay = 0.1f; // seconds per frame
 
     while (!WindowShouldClose())
     {
@@ -101,6 +110,20 @@ int main()
             {
                 gameOver = true;
             }
+
+            // update animation
+            frameTime += dt;
+
+            if (frameTime >= frameDelay)
+            {
+                frameTime = 0.0f;
+                currentFrame++;
+
+                if (currentFrame >= frameCount)
+                {
+                    currentFrame = 0;
+                }
+            }
         }
 
         // Restart
@@ -118,7 +141,7 @@ int main()
         ClearBackground(SKYBLUE);
 
         // Bird
-        DrawRectangleRec(bird.rect, YELLOW);
+        // DrawRectangleRec(bird.rect, YELLOW);
 
         // Pipes
         for (auto &p : pipes)
@@ -136,9 +159,29 @@ int main()
             DrawText("Press R to Restart", 95, 290, 20, BLACK);
         }
 
+        Rectangle source = {
+            (float)(currentFrame * frameWidth),
+            0,
+            (float)frameWidth,
+            (float)frameHeight};
+        // DrawRectangleRec(bird.rect, YELLOW);
+        Rectangle dest = {
+            bird.rect.x,
+            bird.rect.y,
+            bird.rect.width,
+            bird.rect.height};
+
+        DrawTexturePro(
+            birdTex,
+            source,
+            dest,
+            {0, 0},
+            0.0f,
+            WHITE);
+
         EndDrawing();
     }
-
+    UnloadTexture(birdTex);
     CloseWindow();
     return 0;
 }
