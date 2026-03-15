@@ -77,6 +77,24 @@ int main()
     Texture2D pipeFlippedTex = LoadTextureFromImage(pipeImg);
     UnloadImage(pipeImg); // free the CPU image, keep GPU texture
 
+    // Background parallax layers
+    Texture2D bgLayers[6];
+    bgLayers[0] = LoadTexture("1.png"); // sky — far, slowest
+    bgLayers[1] = LoadTexture("2.png");
+    bgLayers[2] = LoadTexture("3.png");
+    bgLayers[3] = LoadTexture("4.png");
+    bgLayers[4] = LoadTexture("5.png");
+    bgLayers[5] = LoadTexture("6.png"); // near, fastest
+
+    // Scroll offsets and speeds for each layer
+    float bgOffsets[6] = {0, 0, 0, 0, 0, 0};
+    const float bgSpeeds[6] = {5.0f, 15.0f, 25.0f, 40.0f, 60.0f, 80.0f};
+
+    // Scaled dimensions — fit width to screen, maintain aspect ratio
+    const float bgW = (float)screenWidth;      // 400
+    const float bgH = bgW * (324.0f / 576.0f); // ~225
+    const float bgY = screenHeight - bgH;      // pin to bottom
+
     const int frameCount = 3; // number of frames in sprite sheet
     const int frameWidth = birdTex.width / frameCount;
     const int frameHeight = birdTex.height;
@@ -103,6 +121,15 @@ int main()
                 bird.velocity = jumpForce;
                 bird.rotation = -25.0f; // snap up on jump
             }
+
+            // Scroll background layers
+            for (int i = 0; i < 6; i++)
+            {
+                bgOffsets[i] -= bgSpeeds[i] * dt;
+                if (bgOffsets[i] <= -bgW)
+                    bgOffsets[i] = 0; // seamless loop
+            }
+
             // Gravity
             bird.velocity += gravity * dt; // 1s = 15 pixel drop per frame
             bird.rect.y += bird.velocity * dt;
@@ -154,7 +181,8 @@ int main()
                 }
 
                 // Collision
-                if (CheckCollisionCircleRec(birdCenter, bird.radius, p.top) || CheckCollisionCircleRec(birdCenter, bird.radius, p.bottom))
+                if (CheckCollisionCircleRec(birdCenter, bird.radius, p.top) ||
+                    CheckCollisionCircleRec(birdCenter, bird.radius, p.bottom))
                 {
                     gameState = STATE_GAMEOVER;
                     // Save to file on game over
@@ -206,7 +234,6 @@ int main()
             // Restart
             if (IsKeyPressed(KEY_R))
             {
-
                 bird.rect.y = 200;
                 bird.velocity = 0;
                 pipes.clear();
@@ -221,7 +248,27 @@ int main()
 
         /* ---------------- DRAW ---------------- */
         BeginDrawing();
-        ClearBackground(SKYBLUE);
+
+        // Sky color fill for top portion not covered by bg image
+        ClearBackground({255, 180, 150, 255}); // matches 1.png sky color
+
+        // Draw all background layers — each drawn twice for seamless scroll
+        // Layer 0 (sky) fills full screen, others pin to bottom
+        for (int i = 0; i < 6; i++)
+        {
+            float y = (i == 0) ? 0 : bgY;
+            float h = (i == 0) ? (float)screenHeight : bgH;
+
+            // First copy
+            Rectangle src = {0, 0, (float)bgLayers[i].width, (float)bgLayers[i].height};
+            Rectangle dst1 = {bgOffsets[i], y, bgW, h};
+            DrawTexturePro(bgLayers[i], src, dst1, {0, 0}, 0.0f, WHITE);
+
+            // Second copy seamlessly follows the first
+            Rectangle dst2 = {bgOffsets[i] + bgW, y, bgW, h};
+            DrawTexturePro(bgLayers[i], src, dst2, {0, 0}, 0.0f, WHITE);
+        }
+        // ↑ background loop ends here
 
         if (gameState == STATE_START)
         {
@@ -241,7 +288,6 @@ int main()
         }
         else
         {
-
             Rectangle source = {
                 (float)(currentFrame * frameWidth),
                 0,
@@ -310,9 +356,9 @@ int main()
         }
 
         EndDrawing();
-    }
+    } // end of while loop
 
-    // Save best score when game exits
+    // Save best score when game exits (Esc or close button)
     std::ofstream outFile("bestscore.txt");
     if (outFile.is_open())
     {
@@ -323,6 +369,8 @@ int main()
     UnloadTexture(birdTex);
     UnloadTexture(pipeTex);
     UnloadTexture(pipeFlippedTex);
+    for (int i = 0; i < 6; i++)
+        UnloadTexture(bgLayers[i]);
     CloseWindow();
     return 0;
 }
