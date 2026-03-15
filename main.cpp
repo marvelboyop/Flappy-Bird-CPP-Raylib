@@ -69,22 +69,22 @@ int main()
 
     GameState gameState = STATE_START;
 
-    Texture2D birdTex = LoadTexture("opSprite.png");
-    Texture2D pipeTex = LoadTexture("pipe.png");
+    Texture2D birdTex = LoadTexture("assets/opSprite.png");
+    Texture2D pipeTex = LoadTexture("assets/pipe.png");
     // Pre-flipped version for top pipes
-    Image pipeImg = LoadImage("pipe.png");
+    Image pipeImg = LoadImage("assets/pipe.png");
     ImageFlipVertical(&pipeImg);
     Texture2D pipeFlippedTex = LoadTextureFromImage(pipeImg);
     UnloadImage(pipeImg); // free the CPU image, keep GPU texture
 
     // Background parallax layers
     Texture2D bgLayers[6];
-    bgLayers[0] = LoadTexture("1.png"); // sky — far, slowest
-    bgLayers[1] = LoadTexture("2.png");
-    bgLayers[2] = LoadTexture("3.png");
-    bgLayers[3] = LoadTexture("4.png");
-    bgLayers[4] = LoadTexture("5.png");
-    bgLayers[5] = LoadTexture("6.png"); // near, fastest
+    bgLayers[0] = LoadTexture("assets/1.png"); // sky — far, slowest
+    bgLayers[1] = LoadTexture("assets/2.png");
+    bgLayers[2] = LoadTexture("assets/3.png");
+    bgLayers[3] = LoadTexture("assets/4.png");
+    bgLayers[4] = LoadTexture("assets/5.png");
+    bgLayers[5] = LoadTexture("assets/6.png"); // near, fastest
 
     // Scroll offsets and speeds for each layer
     float bgOffsets[6] = {0, 0, 0, 0, 0, 0};
