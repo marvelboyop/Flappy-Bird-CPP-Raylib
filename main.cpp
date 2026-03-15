@@ -107,11 +107,27 @@ int main()
     {
         float dt = GetFrameTime();
 
+        // Scroll background layers on all screens
+        for (int i = 0; i < 6; i++)
+        {
+            bgOffsets[i] -= bgSpeeds[i] * dt;
+            if (bgOffsets[i] <= -bgW)
+                bgOffsets[i] = 0;
+        }
+
         /* ---------------- UPDATE ---------------- */
         if (gameState == STATE_START)
         {
             if (IsKeyPressed(KEY_ENTER))
                 gameState = STATE_PLAYING;
+
+            // Animate bird on start screen
+            frameTime += dt;
+            if (frameTime >= frameDelay)
+            {
+                frameTime = 0.0f;
+                currentFrame = (currentFrame + 1) % frameCount;
+            }
         }
         else if (gameState == STATE_PLAYING)
         {
@@ -120,14 +136,6 @@ int main()
             {
                 bird.velocity = jumpForce;
                 bird.rotation = -25.0f; // snap up on jump
-            }
-
-            // Scroll background layers
-            for (int i = 0; i < 6; i++)
-            {
-                bgOffsets[i] -= bgSpeeds[i] * dt;
-                if (bgOffsets[i] <= -bgW)
-                    bgOffsets[i] = 0; // seamless loop
             }
 
             // Gravity
@@ -276,7 +284,8 @@ int main()
             DrawText("FLAPPY BIRD", 70, 150, 40, RED);
 
             // Bird sprite displayed on start screen
-            Rectangle startSource = {0, 0, (float)frameWidth, (float)frameHeight};
+            Rectangle startSource = {(float)(currentFrame * frameWidth), 0,
+                                     (float)frameWidth, (float)frameHeight};
             Rectangle startDest = {170, 220, 60, 60};
             DrawTexturePro(birdTex, startSource, startDest, {0, 0}, 0.0f, WHITE);
 
