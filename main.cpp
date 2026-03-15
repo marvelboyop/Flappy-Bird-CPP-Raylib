@@ -3,10 +3,18 @@
 #include <cstdlib>
 #include <algorithm>
 
+enum GameState
+{
+    STATE_START,
+    STATE_PLAYING,
+    STATE_GAMEOVER
+};
+
 struct Bird
 {
     Rectangle rect;
     float velocity;
+    float radius;
 };
 
 struct Pipe
@@ -28,6 +36,7 @@ int main()
     Bird bird;
     bird.rect = {50, 200, 60, 60};
     bird.velocity = 0;
+    bird.radius = 24.0f;
 
     const float gravity = 900.0f;
     const float jumpForce = -300.0f;
@@ -43,7 +52,8 @@ int main()
 
     float pipeTimer = 0;
     int score = 0;
-    bool gameOver = false;
+    int bestScore = 0;
+    GameState gameState = STATE_START;
 
     Texture2D birdTex = LoadTexture("opSprite.png");
     Texture2D pipeTex = LoadTexture("pipe.png");
@@ -66,7 +76,12 @@ int main()
         float dt = GetFrameTime();
 
         /* ---------------- UPDATE ---------------- */
-        if (!gameOver)
+        if (gameState == STATE_START)
+        {
+            if (IsKeyPressed(KEY_ENTER))
+                gameState = STATE_PLAYING;
+        }
+        else if (gameState == STATE_PLAYING)
         {
             // Jump
             if (IsKeyPressed(KEY_SPACE))
@@ -95,6 +110,10 @@ int main()
                 pipes.push_back(p);
             }
 
+            Vector2 birdCenter = {
+                bird.rect.x + bird.rect.width / 2.0f,
+                bird.rect.y + bird.rect.height / 2.0f};
+
             // Move pipes
             for (auto &p : pipes)
             {
@@ -109,12 +128,12 @@ int main()
                 }
 
                 // Collision
-                if (CheckCollisionRecs(bird.rect, p.top) ||
-                    CheckCollisionRecs(bird.rect, p.bottom))
+                if (CheckCollisionCircleRec(birdCenter, bird.radius, p.top) || CheckCollisionCircleRec(birdCenter, bird.radius, p.bottom))
                 {
-                    gameOver = true;
+                    gameState = STATE_GAMEOVER;
                 }
             }
+
             pipes.erase(
                 std::remove_if(pipes.begin(), pipes.end(),
                                [](const Pipe &p)
@@ -122,9 +141,10 @@ int main()
                 pipes.end());
 
             // Ground & ceiling
-            if (bird.rect.y < 0 || bird.rect.y + bird.rect.height > screenHeight)
+            if (birdCenter.y - bird.radius < 0 ||
+                birdCenter.y + bird.radius > screenHeight)
             {
-                gameOver = true;
+                gameState = STATE_GAMEOVER;
             }
 
             // update animation
@@ -141,94 +161,117 @@ int main()
                 }
             }
         }
-
-        // Restart
-        if (gameOver && IsKeyPressed(KEY_R))
+        else if (gameState == STATE_GAMEOVER)
         {
-            bird.rect.y = 200;
-            bird.velocity = 0;
-            pipes.clear();
-            score = 0;
-            gameOver = false;
+            // Restart
+            if (IsKeyPressed(KEY_R))
+            {
+                if (score > bestScore)
+                    bestScore = score;
+                bird.rect.y = 200;
+                bird.velocity = 0;
+                pipes.clear();
+                pipeTimer = 0;
+                score = 0;
+                currentFrame = 0;
+                frameTime = 0.0f;
+                gameState = STATE_START;
+            }
         }
 
         /* ---------------- DRAW ---------------- */
         BeginDrawing();
         ClearBackground(SKYBLUE);
 
-        // Score
-        DrawText(TextFormat("Score: %d", score), 20, 20, 20, BLACK);
-
-        if (gameOver)
+        if (gameState == STATE_START)
         {
-            DrawText("GAME OVER", 110, 250, 30, RED);
-            DrawText("Press R to Restart", 95, 290, 20, BLACK);
+            // Title
+            DrawText("FLAPPY BIRD", 70, 150, 40, RED);
+
+            // Bird sprite displayed on start screen
+            Rectangle startSource = {0, 0, (float)frameWidth, (float)frameHeight};
+            Rectangle startDest = {170, 220, 60, 60};
+            DrawTexturePro(birdTex, startSource, startDest, {0, 0}, 0.0f, WHITE);
+
+            // Best score
+            DrawText(TextFormat("Best: %d", bestScore), 160, 310, 20, BLACK);
+
+            // Instructions
+            DrawText("Press ENTER to Start", 75, 360, 20, BLACK);
+        }
+        else
+        {
+
+            Rectangle source = {
+                (float)(currentFrame * frameWidth),
+                0,
+                (float)frameWidth,
+                (float)frameHeight};
+
+            Rectangle dest = {
+                bird.rect.x,
+                bird.rect.y,
+                bird.rect.width,
+                bird.rect.height};
+
+            // now pipe texture
+            // BOTTOM PIPES — just two slices
+            for (auto &p : pipes)
+            {
+                float bodyH = p.bottom.height - CAP_DST_H;
+
+                // Cap — fixed
+                Rectangle capSrc = {0, 0, (float)pipeTex.width, CAP_TEX_H};
+                Rectangle capDest = {p.bottom.x, p.bottom.y, p.bottom.width, CAP_DST_H};
+                DrawTexturePro(pipeTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
+
+                // Body — everything below the cap, stretched
+                Rectangle bodySrc = {0, CAP_TEX_H,
+                                     (float)pipeTex.width,
+                                     (float)pipeTex.height - CAP_TEX_H};
+                Rectangle bodyDest = {p.bottom.x, p.bottom.y + CAP_DST_H,
+                                      p.bottom.width, bodyH};
+                DrawTexturePro(pipeTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
+            }
+
+            // ── TOP PIPES ──
+            // After vertical flip: body is at top, cap is at bottom of flipped texture
+            for (auto &p : pipes)
+            {
+                float bodyH = p.top.height - CAP_DST_H;
+
+                // Body — top portion of flipped texture, stretched
+                Rectangle bodySrc = {0, 0,
+                                     (float)pipeFlippedTex.width,
+                                     (float)pipeFlippedTex.height - CAP_TEX_H};
+                Rectangle bodyDest = {p.top.x, p.top.y, p.top.width, bodyH};
+                DrawTexturePro(pipeFlippedTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
+
+                // Cap — bottom portion of flipped texture, fixed height
+                Rectangle capSrc = {0, (float)pipeFlippedTex.height - CAP_TEX_H,
+                                    (float)pipeFlippedTex.width, CAP_TEX_H};
+                Rectangle capDest = {p.top.x, p.top.y + bodyH, p.top.width, CAP_DST_H};
+                DrawTexturePro(pipeFlippedTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
+            }
+
+            // Bird AFTER pipes so it always appears in front
+            DrawTexturePro(birdTex, source, dest, {0, 0}, 0.0f, WHITE);
+
+            // UI — always drawn last so it appears on top of everything
+            DrawText(TextFormat("Score: %d", score), 20, 20, 20, BLACK);
+
+            if (gameState == STATE_GAMEOVER)
+            {
+                DrawText("GAME OVER", 110, 250, 30, RED);
+                DrawText("Press R to Restart", 95, 290, 20, BLACK);
+            }
         }
 
-        Rectangle source = {
-            (float)(currentFrame * frameWidth),
-            0,
-            (float)frameWidth,
-            (float)frameHeight};
-        // DrawRectangleRec(bird.rect, YELLOW);
-        Rectangle dest = {
-            bird.rect.x,
-            bird.rect.y,
-            bird.rect.width,
-            bird.rect.height};
-
-        DrawTexturePro(
-            birdTex,
-            source,
-            dest,
-            {0, 0},
-            0.0f,
-            WHITE);
-
-        // now pipe texture
-        // BOTTOM PIPES — just two slices
-        for (auto &p : pipes)
-        {
-            float bodyH = p.bottom.height - CAP_DST_H;
-
-            // Cap — fixed
-            Rectangle capSrc = {0, 0, (float)pipeTex.width, CAP_TEX_H};
-            Rectangle capDest = {p.bottom.x, p.bottom.y, p.bottom.width, CAP_DST_H};
-            DrawTexturePro(pipeTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
-
-            // Body — everything below the cap, stretched
-            Rectangle bodySrc = {0, CAP_TEX_H,
-                                 (float)pipeTex.width,
-                                 (float)pipeTex.height - CAP_TEX_H};
-            Rectangle bodyDest = {p.bottom.x, p.bottom.y + CAP_DST_H,
-                                  p.bottom.width, bodyH};
-            DrawTexturePro(pipeTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
-        }
-
-        // ── TOP PIPES ──
-        // After vertical flip: body is at top, cap is at bottom of flipped texture
-        for (auto &p : pipes)
-        {
-            float bodyH = p.top.height - CAP_DST_H;
-
-            // Body — top portion of flipped texture, stretched
-            Rectangle bodySrc = {0, 0,
-                                 (float)pipeFlippedTex.width,
-                                 (float)pipeFlippedTex.height - CAP_TEX_H};
-            Rectangle bodyDest = {p.top.x, p.top.y, p.top.width, bodyH};
-            DrawTexturePro(pipeFlippedTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
-
-            // Cap — bottom portion of flipped texture, fixed height
-            Rectangle capSrc = {0, (float)pipeFlippedTex.height - CAP_TEX_H,
-                                (float)pipeFlippedTex.width, CAP_TEX_H};
-            Rectangle capDest = {p.top.x, p.top.y + bodyH, p.top.width, CAP_DST_H};
-            DrawTexturePro(pipeFlippedTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
-        }
         EndDrawing();
     }
     UnloadTexture(birdTex);
     UnloadTexture(pipeTex);
-    UnloadTexture(pipeFlippedTex); // add this alongside UnloadTexture(pipeTex)
+    UnloadTexture(pipeFlippedTex);
     CloseWindow();
     return 0;
 }
