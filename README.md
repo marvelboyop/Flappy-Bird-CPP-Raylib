@@ -116,7 +116,7 @@ A circle hitbox centered on the bird is used with `CheckCollisionCircleRec` for 
 
 ## Releases
 
-Pre-built releases are available on the [GitHub Releases]([../../releases](https://github.com/marvelboyop/Flappy-Bird-CPP-Raylib/releases/tag/v1.0.0) page. Download the latest version for your platform and run it directly — no build required.
+Pre-built releases are available on the [GitHub Releases][../../releases](https://github.com/marvelboyop/Flappy-Bird-CPP-Raylib/releases/tag/v1.0.0) page. Download the latest version for your platform and run it directly — no build required.
 
 ---
 
