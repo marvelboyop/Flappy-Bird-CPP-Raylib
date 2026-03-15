@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdlib>
 #include <algorithm>
+#include <fstream>
 
 enum GameState
 {
@@ -47,7 +48,7 @@ int main()
     std::vector<Pipe> pipes;
     const float pipeSpeed = 200.0f;
     const int pipeWidth = 60;
-    const int gap = 165;
+    const int gap = 130;
 
     const float CAP_TEX_H = 24.0f; // pixels of cap inside pipeTex
     const float CAP_DST_H = 24.0f; // how tall to draw the cap on screen
@@ -55,6 +56,17 @@ int main()
     float pipeTimer = 0;
     int score = 0;
     int bestScore = 0;
+
+    // Load best score from file
+    {
+        std::ifstream inFile("bestscore.txt");
+        if (inFile.is_open())
+        {
+            inFile >> bestScore;
+            inFile.close();
+        }
+    }
+
     GameState gameState = STATE_START;
 
     Texture2D birdTex = LoadTexture("opSprite.png");
@@ -109,7 +121,7 @@ int main()
             {
                 pipeTimer = 0;
 
-                int topHeight = GetRandomValue(50, 230); // this is top pipe height
+                int topHeight = GetRandomValue(30, 300); // this is top pipe height
                 Pipe p;
                 p.top = {(float)screenWidth, 0, (float)pipeWidth, (float)topHeight};
                 p.bottom = {(float)screenWidth, (float)(topHeight + gap),
@@ -135,12 +147,23 @@ int main()
                 {
                     score++;
                     p.passed = true;
+
+                    // update live as player beats it
+                    if (score > bestScore)
+                        bestScore = score; // just update variable
                 }
 
                 // Collision
                 if (CheckCollisionCircleRec(birdCenter, bird.radius, p.top) || CheckCollisionCircleRec(birdCenter, bird.radius, p.bottom))
                 {
                     gameState = STATE_GAMEOVER;
+                    // Save to file on game over
+                    std::ofstream outFile("bestscore.txt");
+                    if (outFile.is_open())
+                    {
+                        outFile << bestScore;
+                        outFile.close();
+                    }
                 }
             }
 
@@ -150,11 +173,18 @@ int main()
                                { return p.top.x + p.top.width < 0; }),
                 pipes.end());
 
-            // Ground & ceiling
+            // Ground & ceiling collision
             if (birdCenter.y - bird.radius < 0 ||
                 birdCenter.y + bird.radius > screenHeight)
             {
                 gameState = STATE_GAMEOVER;
+                // Save to file on game over
+                std::ofstream outFile("bestscore.txt");
+                if (outFile.is_open())
+                {
+                    outFile << bestScore;
+                    outFile.close();
+                }
             }
 
             // update animation
@@ -176,8 +206,7 @@ int main()
             // Restart
             if (IsKeyPressed(KEY_R))
             {
-                if (score > bestScore)
-                    bestScore = score;
+
                 bird.rect.y = 200;
                 bird.velocity = 0;
                 pipes.clear();
@@ -271,6 +300,7 @@ int main()
 
             // UI — always drawn last so it appears on top of everything
             DrawText(TextFormat("Score: %d", score), 20, 20, 20, BLACK);
+            DrawText(TextFormat("Best: %d", bestScore), screenWidth - 110, 20, 20, BLACK);
 
             if (gameState == STATE_GAMEOVER)
             {
@@ -281,6 +311,15 @@ int main()
 
         EndDrawing();
     }
+
+    // Save best score when game exits
+    std::ofstream outFile("bestscore.txt");
+    if (outFile.is_open())
+    {
+        outFile << bestScore;
+        outFile.close();
+    }
+
     UnloadTexture(birdTex);
     UnloadTexture(pipeTex);
     UnloadTexture(pipeFlippedTex);
