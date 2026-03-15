@@ -15,6 +15,7 @@ struct Bird
     Rectangle rect;
     float velocity;
     float radius;
+    float rotation;
 };
 
 struct Pipe
@@ -37,6 +38,7 @@ int main()
     bird.rect = {50, 200, 60, 60};
     bird.velocity = 0;
     bird.radius = 24.0f;
+    bird.rotation = 0.0f;
 
     const float gravity = 900.0f;
     const float jumpForce = -300.0f;
@@ -83,15 +85,23 @@ int main()
         }
         else if (gameState == STATE_PLAYING)
         {
-            // Jump
+            // Jump — snap to nose up instantly like classic flappy bird
             if (IsKeyPressed(KEY_SPACE))
             {
                 bird.velocity = jumpForce;
+                bird.rotation = -25.0f; // snap up on jump
             }
-
             // Gravity
             bird.velocity += gravity * dt; // 1s = 15 pixel drop per frame
             bird.rect.y += bird.velocity * dt;
+
+            // Smoothly rotate down as bird falls
+            if (bird.velocity > 0)
+            {
+                bird.rotation += 200.0f * dt; // rotate toward ground
+                if (bird.rotation > 90.0f)
+                    bird.rotation = 90.0f; // cap at nosedive
+            }
 
             // Pipe spawn
             pipeTimer += dt;
@@ -175,6 +185,7 @@ int main()
                 score = 0;
                 currentFrame = 0;
                 frameTime = 0.0f;
+                bird.rotation = 0.0f;
                 gameState = STATE_START;
             }
         }
@@ -207,12 +218,6 @@ int main()
                 0,
                 (float)frameWidth,
                 (float)frameHeight};
-
-            Rectangle dest = {
-                bird.rect.x,
-                bird.rect.y,
-                bird.rect.width,
-                bird.rect.height};
 
             // now pipe texture
             // BOTTOM PIPES — just two slices
@@ -255,7 +260,14 @@ int main()
             }
 
             // Bird AFTER pipes so it always appears in front
-            DrawTexturePro(birdTex, source, dest, {0, 0}, 0.0f, WHITE);
+            // Origin set to center so rotation happens around the bird's middle
+            Vector2 origin = {bird.rect.width / 2.0f, bird.rect.height / 2.0f};
+            Rectangle dest = {
+                bird.rect.x + bird.rect.width / 2.0f,
+                bird.rect.y + bird.rect.height / 2.0f,
+                bird.rect.width,
+                bird.rect.height};
+            DrawTexturePro(birdTex, source, dest, origin, bird.rotation, WHITE);
 
             // UI — always drawn last so it appears on top of everything
             DrawText(TextFormat("Score: %d", score), 20, 20, 20, BLACK);
