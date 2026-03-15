@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include <vector>
 #include <cstdlib>
+#include <algorithm>
 
 struct Bird
 {
@@ -37,13 +38,21 @@ int main()
     const int pipeWidth = 60;
     const int gap = 165;
 
+    const float CAP_TEX_H = 24.0f; // pixels of cap inside pipeTex
+    const float CAP_DST_H = 24.0f; // how tall to draw the cap on screen
+
     float pipeTimer = 0;
     int score = 0;
     bool gameOver = false;
 
     Texture2D birdTex = LoadTexture("opSprite.png");
     Texture2D pipeTex = LoadTexture("pipe.png");
-    Texture2D pipetopTex = LoadTexture("top_pipe.png");
+    // Pre-flipped version for top pipes
+    Image pipeImg = LoadImage("pipe.png");
+    ImageFlipVertical(&pipeImg);
+    Texture2D pipeFlippedTex = LoadTextureFromImage(pipeImg);
+    UnloadImage(pipeImg); // free the CPU image, keep GPU texture
+
     const int frameCount = 3; // number of frames in sprite sheet
     const int frameWidth = birdTex.width / frameCount;
     const int frameHeight = birdTex.height;
@@ -106,6 +115,11 @@ int main()
                     gameOver = true;
                 }
             }
+            pipes.erase(
+                std::remove_if(pipes.begin(), pipes.end(),
+                               [](const Pipe &p)
+                               { return p.top.x + p.top.width < 0; }),
+                pipes.end());
 
             // Ground & ceiling
             if (bird.rect.y < 0 || bird.rect.y + bird.rect.height > screenHeight)
@@ -142,16 +156,6 @@ int main()
         BeginDrawing();
         ClearBackground(SKYBLUE);
 
-        // Bird
-        // DrawRectangleRec(bird.rect, YELLOW);
-
-        // Pipes
-        // // for (auto &p : pipes)
-        // {
-        //     DrawRectangleRec(p.top, GREEN);
-        //     DrawRectangleRec(p.bottom, GREEN);
-        // }
-
         // Score
         DrawText(TextFormat("Score: %d", score), 20, 20, 20, BLACK);
 
@@ -182,139 +186,49 @@ int main()
             WHITE);
 
         // now pipe texture
+        // BOTTOM PIPES — just two slices
         for (auto &p : pipes)
         {
-            float neededHeight = p.bottom.height;
+            float bodyH = p.bottom.height - CAP_DST_H;
 
-            // ---- If pipe height <= texture height ----
-            if (neededHeight <= pipeTex.height)
-            {
-                Rectangle pipe_source = {
-                    0.0f,
-                    0.0f,
-                    (float)pipeTex.width,
-                    neededHeight};
+            // Cap — fixed
+            Rectangle capSrc = {0, 0, (float)pipeTex.width, CAP_TEX_H};
+            Rectangle capDest = {p.bottom.x, p.bottom.y, p.bottom.width, CAP_DST_H};
+            DrawTexturePro(pipeTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
 
-                Rectangle pipe_dest = {
-                    p.bottom.x,
-                    p.bottom.y,
-                    p.bottom.width,
-                    neededHeight};
-
-                DrawTexturePro(pipeTex,
-                               pipe_source,
-                               pipe_dest,
-                               {0, 0},
-                               0.0f,
-                               WHITE);
-            }
-            else
-            {
-                // ---- If pipe height is larger than texture ----
-                // Draw full texture stretched to pipe height
-
-                Rectangle pipe_source = {
-                    0.0f,
-                    0.0f,
-                    (float)pipeTex.width,
-                    (float)pipeTex.height};
-
-                Rectangle pipe_dest = {
-                    p.bottom.x,
-                    p.bottom.y,
-                    p.bottom.width,
-                    p.bottom.height};
-
-                DrawTexturePro(pipeTex,
-                               pipe_source,
-                               pipe_dest,
-                               {0, 0},
-                               0.0f,
-                               WHITE);
-            }
+            // Body — everything below the cap, stretched
+            Rectangle bodySrc = {0, CAP_TEX_H,
+                                 (float)pipeTex.width,
+                                 (float)pipeTex.height - CAP_TEX_H};
+            Rectangle bodyDest = {p.bottom.x, p.bottom.y + CAP_DST_H,
+                                  p.bottom.width, bodyH};
+            DrawTexturePro(pipeTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
         }
 
-        // ---- TOP PIPE ----
+        // ── TOP PIPES ──
+        // After vertical flip: body is at top, cap is at bottom of flipped texture
         for (auto &p : pipes)
         {
-            float neededHeight = p.top.height;
+            float bodyH = p.top.height - CAP_DST_H;
 
-            if (neededHeight <= pipeTex.height)
-            {
-                // Slice from top downward (include cap)
-                Rectangle pipe_source = {
-                    0.0f,
-                    0.0f,
-                    (float)pipeTex.width,
-                    neededHeight};
+            // Body — top portion of flipped texture, stretched
+            Rectangle bodySrc = {0, 0,
+                                 (float)pipeFlippedTex.width,
+                                 (float)pipeFlippedTex.height - CAP_TEX_H};
+            Rectangle bodyDest = {p.top.x, p.top.y, p.top.width, bodyH};
+            DrawTexturePro(pipeFlippedTex, bodySrc, bodyDest, {0, 0}, 0.0f, WHITE);
 
-                // Flip vertically by using negative height
-                Rectangle pipe_dest = {
-                    p.top.x,
-                    p.top.y + neededHeight, // move down to gap edge
-                    p.top.width,
-                    -neededHeight // grow upward
-                };
-
-                DrawTexturePro(pipeTex,
-                               pipe_source,
-                               pipe_dest,
-                               {0, 0},
-                               0.0f,
-                               WHITE);
-            }
-            else
-            {
-                // If pipe taller than texture
-                Rectangle pipe_source = {
-                    0.0f,
-                    0.0f,
-                    (float)pipeTex.width,
-                    (float)pipeTex.height};
-
-                Rectangle pipe_dest = {
-                    p.top.x,
-                    p.top.y + p.top.height,
-                    p.top.width,
-                    -p.top.height};
-
-                DrawTexturePro(pipeTex,
-                               pipe_source,
-                               pipe_dest,
-                               {0, 0},
-                               0.0f,
-                               WHITE);
-            }
+            // Cap — bottom portion of flipped texture, fixed height
+            Rectangle capSrc = {0, (float)pipeFlippedTex.height - CAP_TEX_H,
+                                (float)pipeFlippedTex.width, CAP_TEX_H};
+            Rectangle capDest = {p.top.x, p.top.y + bodyH, p.top.width, CAP_DST_H};
+            DrawTexturePro(pipeFlippedTex, capSrc, capDest, {0, 0}, 0.0f, WHITE);
         }
-
-        //     for (auto &p : pipes)
-        //   {
-        /////////////////////////////////////////////////
-        // Rectangle flipped_source = {
-        //     0,
-        //     (float)pipeTex.height,
-        //     (float)pipeTex.width,
-        //     -(float)pipeTex.height};
-
-        // Rectangle pipe_dest_top = {
-        //     p.top.x,
-        //     p.top.y + p.top.height,
-        //     p.top.width,
-        //     p.top.height,
-        // };
-
-        // DrawTexturePro(pipeTex,
-        //                flipped_source,
-        //                pipe_dest_top,
-        //                {0, 0},
-        //                0.0f,
-        //                WHITE);
-        //       }
         EndDrawing();
     }
     UnloadTexture(birdTex);
     UnloadTexture(pipeTex);
-    UnloadTexture(pipetopTex);
+    UnloadTexture(pipeFlippedTex); // add this alongside UnloadTexture(pipeTex)
     CloseWindow();
     return 0;
 }
